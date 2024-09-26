@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Registration Form with Profile Picture</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+        form {
+            margin-bottom: 20px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        table, th, td {
+            border: 1px solid #ccc;
+            padding: 8px;
+            text-align: left;
+        }
+        th {
+            background-color: #f2f2f2;
+        }
+    </style>
+</head>
+<body>
+
+    <h2>Registration Form</h2>
+    <form id="registrationForm">
+        <label for="name">Name:</label>
+        <input type="text" id="name" required><br><br>
+        
+        <label for="email">Email:</label>
+        <input type="email" id="email" required><br><br>
+        
+        <label for="profilePicture">Profile Picture:</label>
+        <input type="file" id="profilePicture" accept="image/*" required><br><br>
+        
+        <button type="submit">Register</button>
+    </form>
+
+    <h2>Registered Users</h2>
+    <table id="usersTable">
+        <thead>
+            <tr>
+                <th>Name</th>
+                <th>Email</th>
+                <th>Profile Picture</th>
+                <th>Action</th>
+            </tr>
+        </thead>
+        <tbody></tbody>
+    </table>
+
+    <!-- Firebase SDK -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/9.19.1/firebase-app.js";
+        import { getDatabase, ref, set, onValue, remove } from "https://www.gstatic.com/firebasejs/9.19.1/firebase-database.js";
+        import { getStorage, ref as storageRef, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/9.19.1/firebase-storage.js";
+
+        // Your Firebase configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyD_NaUEPPiRnJS74F2R9JKF5rmiHIN1W6g",
+            authDomain: "ronika-cistrn.firebaseapp.com",
+            databaseURL: "https://ronika-cistrn.firebaseio.com/",
+            projectId: "ronika-cistrn",
+            storageBucket: "ronika-cistrn.appspot.com",
+            messagingSenderId: "810422833184",
+            appId: "1:810422833184:web:e8a9b1a4aa86dd4636ec45",
+        };
+
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const database = getDatabase(app);
+        const storage = getStorage(app);
+        const usersRef = ref(database, 'users');
+
+        // Handle form submission
+        document.getElementById('registrationForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const name = document.getElementById('name').value;
+            const email = document.getElementById('email').value;
+            const file = document.getElementById('profilePicture').files[0];
+
+            // Upload the image to Firebase Storage
+            const imageRef = storageRef(storage, 'profilePictures/' + file.name);
+            await uploadBytes(imageRef, file);
+            const imageUrl = await getDownloadURL(imageRef);
+
+            // Save user data to Firebase Realtime Database
+            const userId = Date.now(); // Simple ID based on timestamp
+            await set(ref(database, 'users/' + userId), {
+                name: name,
+                email: email,
+                profilePicture: imageUrl
+            });
+
+            document.getElementById('registrationForm').reset();
+            loadUsers();
+        });
+
+        // Load registered users and display them in the table
+        function loadUsers() {
+            onValue(usersRef, (snapshot) => {
+                const data = snapshot.val() || {};
+                const tbody = document.getElementById('usersTable').querySelector('tbody');
+                tbody.innerHTML = '';
+
+                for (const userId in data) {
+                    const user = data[userId];
+                    const row = document.createElement('tr');
+
+                    row.innerHTML = `
+                        <td>${user.name}</td>
+                        <td>${user.email}</td>
+                        <td><img src="${user.profilePicture}" alt="${user.name}" width="50"></td>
+                        <td><button onclick="deleteUser('${userId}')">Delete</button></td>
+                    `;
+                    tbody.appendChild(row);
+                }
+            });
+        }
+
+        // Function to delete a user
+        window.deleteUser = async function(userId) {
+            await remove(ref(database, 'users/' + userId));
+            loadUsers(); // Reload users after deletion
+        };
+
+        // Initial load of users
+        loadUsers();
+    </script>
+
+</body>
+</html>
